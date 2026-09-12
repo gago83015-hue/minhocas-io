@@ -207,6 +207,7 @@ body.cursor-free .ti{cursor:text!important;}
 #mpBadge{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:21;display:none;background:var(--panel);border:1px solid var(--pline);border-radius:20px;padding:4px 10px;font:9px 'Orbitron',sans-serif;color:var(--mint);pointer-events:none;letter-spacing:1px;}
 .langRow{display:flex;align-items:center;gap:8px;margin-top:7px}.langSelect{flex:1;background:#091317;color:#fff;border:1px solid rgba(61,242,200,.25);border-radius:7px;padding:7px 8px;font:10px 'Rajdhani',sans-serif;}
 </style>
+<style id="landscapeMobileStyle">@media (max-width:899px) and (orientation:portrait){body.landscapeHint::after{content:'Vire o celular de lado para jogar';position:fixed;inset:0;z-index:999;background:rgba(3,6,7,.97);display:flex;align-items:center;justify-content:center;color:#fff;font:700 18px Orbitron,sans-serif;text-align:center;padding:30px}}</style>
 </head>
 <body>
 <canvas id="game"></canvas>
@@ -267,7 +268,6 @@ body.cursor-free .ti{cursor:text!important;}
   <details class="pnl">
     <summary>Configurações</summary>
     <div class="crow langRow"><div class="clbl">Idioma<small>Idioma do jogo</small></div><select class="langSelect" id="langSel"><option value="pt">Português</option><option value="es">Español</option></select></div>
-    <div class="crow langRow"><div class="clbl">Idioma<small>Idioma do jogo</small></div><select class="langSelect" id="langSel"><option value="pt">Português</option><option value="es">Español</option></select></div>
     <div class="crow">
       <div class="clbl">Controle<small>Escolha como controlar a minhoca</small></div>
       <div class="ctrlModes" id="ctrlModes">
@@ -286,6 +286,12 @@ body.cursor-free .ti{cursor:text!important;}
       <div class="clbl">Minimapa<small>Mapa no canto</small></div>
       <label class="tog"><input type="checkbox" id="tM" checked><div class="tog-t"></div><div class="tog-k"></div></label>
     </div>
+    <div class="crow"><div class="clbl">Música<small>Estilo da trilha</small></div><select class="langSelect" id="musicSel"><option value="off">Sem música</option><option value="relax">Relaxante</option><option value="electro">Eletrônica</option><option value="hiphop">Hip-Hop</option></select></div>
+    <div class="crow"><div class="clbl">Volume<small>Som e música</small></div><input id="volSel" type="range" min="0" max="100" step="1" style="width:125px"></div>
+    <div class="crow"><div class="clbl">Jogo mudo<small>Desliga todos os sons</small></div><label class="tog"><input type="checkbox" id="muteSel"><div class="tog-t"></div><div class="tog-k"></div></label></div>
+    <div class="crow"><div class="clbl">Tela deitada<small>Celular em modo horizontal</small></div><label class="tog"><input type="checkbox" id="landSel"><div class="tog-t"></div><div class="tog-k"></div></label></div>
+    <div class="crow"><div class="clbl">Chão / papel de parede<small>Você caminha sobre o desenho</small></div><select class="langSelect" id="wallSel"><option value="grid">Grade</option><option value="paper">Papel</option><option value="earth">Terra</option><option value="blue">Azul</option><option value="leaves">Folhas</option></select></div>
+    <div class="crow" style="display:block"><div class="clbl">Minhas músicas<small>Arquivos de áudio ficam somente neste navegador</small></div><input id="musicFiles" type="file" accept="audio/*" multiple style="width:100%;margin-top:6px;font-size:10px"><div id="customMusicList" style="margin-top:6px"></div></div>
   </details>
   <button class="btn hf" id="playBtn" style="margin-top:4px;">JOGAR</button>
 </div>
@@ -339,6 +345,12 @@ body.cursor-free .ti{cursor:text!important;}
       <div class="clbl">Minimapa<small>Mapa no canto</small></div>
       <label class="tog"><input type="checkbox" id="tMM" checked><div class="tog-t"></div><div class="tog-k"></div></label>
     </div>
+    <div class="crow"><div class="clbl">Música<small>Estilo da trilha</small></div><select class="langSelect" id="musicSelM"><option value="off">Sem música</option><option value="relax">Relaxante</option><option value="electro">Eletrônica</option><option value="hiphop">Hip-Hop</option></select></div>
+    <div class="crow"><div class="clbl">Volume<small>Som e música</small></div><input id="volSelM" type="range" min="0" max="100" step="1" style="width:125px"></div>
+    <div class="crow"><div class="clbl">Jogo mudo<small>Desliga todos os sons</small></div><label class="tog"><input type="checkbox" id="muteSelM"><div class="tog-t"></div><div class="tog-k"></div></label></div>
+    <div class="crow"><div class="clbl">Tela deitada<small>Celular em modo horizontal</small></div><label class="tog"><input type="checkbox" id="landSelM"><div class="tog-t"></div><div class="tog-k"></div></label></div>
+    <div class="crow"><div class="clbl">Chão / papel de parede<small>Você caminha sobre o desenho</small></div><select class="langSelect" id="wallSelM"><option value="grid">Grade</option><option value="paper">Papel</option><option value="earth">Terra</option><option value="blue">Azul</option><option value="leaves">Folhas</option></select></div>
+    <div class="crow" style="display:block"><div class="clbl">Minhas músicas<small>Arquivos de áudio ficam somente neste navegador</small></div><input id="musicFilesM" type="file" accept="audio/*" multiple style="width:100%;margin-top:6px;font-size:10px"><div id="customMusicListM" style="margin-top:6px"></div></div>
   </details>
 <div class="colorBox">
     <div class="colorTitle">COR DA MINHOCA</div>
@@ -453,7 +465,7 @@ const LS={
   g(k){try{return JSON.parse(localStorage.getItem(k))||null;}catch(e){return null;}},
   s(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
 };
-let cfg=Object.assign({controlMode:'pc',joyLeft:true,minimap:true,lang:'pt',skinId:'normal',colorMode:'one',color1:'#3df2c8',color2:'#ff5fa8',customPaint:['#3df2c8','#3df2c8','#36a3ff','#36a3ff','#7d5cff','#7d5cff','#ff5fa8','#ff5fa8','#ffb84d','#ffb84d','#7dff5b','#7dff5b']},LS.g('mio4')||{});
+let cfg=Object.assign({controlMode:'pc',joyLeft:true,minimap:true,lang:'pt',skinId:'normal',colorMode:'one',music:'off',volume:55,mute:false,landscapeMobile:false,wallpaper:'grid',color1:'#3df2c8',color2:'#ff5fa8',customPaint:['#3df2c8','#3df2c8','#36a3ff','#36a3ff','#7d5cff','#7d5cff','#ff5fa8','#ff5fa8','#ffb84d','#ffb84d','#7dff5b','#7dff5b']},LS.g('mio4')||{});
 let hall=LS.g('mio4h')||[];
 const saveCfg=()=>LS.s('mio4',cfg);
 const saveHall=()=>LS.s('mio4h',hall);
@@ -492,6 +504,7 @@ function layout(){
 
 function applyControlMode(){
   const mobile=cfg.controlMode==='mobile';
+  document.body.classList.toggle('landscapeHint',mobile&&cfg.landscapeMobile);
   joyBase.style.display=mobile?'block':'none';
   boostEl.style.display=mobile?'block':'block';
   document.getElementById('desktopHelp').style.display=mobile?'none':'';
@@ -517,7 +530,9 @@ function syncUI(){
   if(elm) elm.checked=true;
   const tmm=document.getElementById('tMM');
   if(tmm) tmm.checked=cfg.minimap;
+  syncAudioUI();
 }
+
 function readUI(fromMenu){
   if(fromMenu){
     cfg.joyLeft=document.getElementById('jLM').checked;
@@ -533,13 +548,16 @@ function readUI(fromMenu){
   const el=document.getElementById(id);
   if(el) el.addEventListener('change',()=>readUI(false));
 });
-document.querySelectorAll('.ctrlMode').forEach(b=>b.addEventListener('click',()=>{cfg.controlMode=b.dataset.mode;saveCfg();applyControlMode();}));
+document.querySelectorAll('.ctrlMode').forEach(b=>b.addEventListener('click',()=>{cfg.controlMode=b.dataset.mode;saveCfg();applyControlMode();requestLandscape();syncAudioUI();}));
 
 ['jLM','jRM','tMM'].forEach(id=>{
   const el=document.getElementById(id);
   if(el) el.addEventListener('change',()=>readUI(true));
 });
 
+function syncAudioUI(){['musicSel','musicSelM'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=cfg.music;});['volSel','volSelM'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=cfg.volume;});['muteSel','muteSelM'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=!!cfg.mute;});['landSel','landSelM'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=!!cfg.landscapeMobile;});['wallSel','wallSelM'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=cfg.wallpaper;});renderCustomMusic();}
+function requestLandscape(){if(cfg.controlMode!=='mobile'||!cfg.landscapeMobile)return;try{const p=document.documentElement.requestFullscreen?document.documentElement.requestFullscreen():Promise.resolve();Promise.resolve(p).then(()=>{if(screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(()=>{});});}catch(e){}}
+function wireAudioUI(){['musicSel','musicSelM'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('change',()=>{cfg.music=e.value;saveCfg();playMusic();syncAudioUI();});});['volSel','volSelM'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('input',()=>{cfg.volume=+e.value;saveCfg();setMusicGain();if(customAudio)customAudio.volume=cfg.mute?0:cfg.volume/100;syncAudioUI();});});['muteSel','muteSelM'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('change',()=>{cfg.mute=e.checked;saveCfg();applyAudio();syncAudioUI();});});['landSel','landSelM'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('change',()=>{cfg.landscapeMobile=e.checked;saveCfg();requestLandscape();syncAudioUI();});});['wallSel','wallSelM'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('change',()=>{cfg.wallpaper=e.value;saveCfg();syncAudioUI();});});['musicFiles','musicFilesM'].forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('change',()=>addCustomFiles(e.files));});document.addEventListener('click',e=>{const p=e.target.closest('[data-playcustom]');if(p){cfg.music='custom:'+p.dataset.playcustom;saveCfg();playMusic();syncAudioUI();}const d=e.target.closest('[data-delcustom]');if(d){const i=customTracks.findIndex(x=>x.id===d.dataset.delcustom);if(i>=0){if(cfg.music==='custom:'+customTracks[i].id){cfg.music='off';stopBuiltInMusic();}URL.revokeObjectURL(customTracks[i].url);customTracks.splice(i,1);saveCfg();syncAudioUI();}}});}
 /* ══════════════════════════════════════
    HALL DA FAMA
 ══════════════════════════════════════ */
@@ -583,7 +601,7 @@ function skSVG(sk){
   }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W2}" height="${H2}" viewBox="0 0 ${W2} ${H2}">${s}</svg>`;
 }
-const COLOR_PALETTE=['#3df2c8','#36a3ff','#7d5cff','#ff5fa8','#ff3b30','#ffb84d','#ffe44d','#7dff5b','#ffffff','#22252b'];
+const COLOR_PALETTE=['#3df2c8','#36a3ff','#7d5cff','#ff5fa8','#ff2f92','#ff3b30','#ffb84d','#ffe44d','#7dff5b','#ffffff','#22252b'];
 function hexToHsl(hex){const n=parseInt(hex.slice(1),16),r=(n>>16)&255,g=(n>>8)&255,b=n&255;const mx=Math.max(r,g,b)/255,mn=Math.min(r,g,b)/255,l=(mx+mn)/2;if(mx===mn)return [0,0,l*100];const d=mx-mn,s=l>.5?d/(2-mx-mn):d/(mx+mn);let h=0;if(mx===r)h=((g/255-b/255)/d+(g<b?6:0))/6;else if(mx===g)h=((b/255-r/255)/d+2)/6;else h=((r/255-g/255)/d+4)/6;return [h*360,s*100,l*100];}
 function paintForPlayer(){
   if(cfg.colorMode==='rainbow'){return {col:'hsl(0,90%,62%)',colD:'hsl(0,80%,36%)',rainbow:true};}
@@ -625,6 +643,7 @@ function rareSVG(sk){
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W2}" height="${H2}" viewBox="0 0 ${W2} ${H2}">${out}</svg>`;
 }
 
+function trText(v){return cfg.lang==='es'&&I18N.es[v]?I18N.es[v]:v;}
 function buildSkins(){
   renderPaintGrid();
   const g=document.getElementById('skG');
@@ -792,6 +811,25 @@ function soundTurbo(on){
 function soundHit(){ const now=performance.now(); if(now-lastHitSound<90)return;lastHitSound=now; audioStart(); sfxTone(110,.12,'square',.06,-70); setTimeout(()=>sfxTone(55,.16,'sawtooth',.035,-25),25); }
 function soundEat(){ audioStart(); sfxTone(520,.055,'sine',.018,180); }
 function soundDeath(){ audioStart(); sfxTone(180,.22,'sawtooth',.055,-130); setTimeout(()=>sfxTone(70,.32,'square',.04,-35),80); }
+/* ══════════════════════════════════════
+   MÚSICA — trilhas geradas pelo próprio navegador
+   Sem arquivos externos. 3 estilos + arquivos pessoais.
+══════════════════════════════════════ */
+let musicTimer=null,musicStep=0,musicNodes=[],customTracks=[],customAudio=null;
+let musicMaster=null;
+function ensureMusic(){audioStart();if(!musicMaster){musicMaster=audioCtx.createGain();musicMaster.gain.value=0;musicMaster.connect(audioCtx.destination);}setMusicGain();}
+function setMusicGain(){if(!musicMaster)return;const v=cfg.mute?0:(Math.max(0,Math.min(100,cfg.volume))/100)*.16;musicMaster.gain.setTargetAtTime(v,audioCtx.currentTime,.03);}
+function mTone(freq,dur,type,gain,when,slide=0){if(!audioCtx||!musicMaster)return;const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.setValueAtTime(freq,when);if(slide)o.frequency.linearRampToValueAtTime(Math.max(30,freq+slide),when+dur);g.gain.setValueAtTime(.0001,when);g.gain.linearRampToValueAtTime(gain,when+.015);g.gain.exponentialRampToValueAtTime(.0001,when+dur);o.connect(g).connect(musicMaster);o.start(when);o.stop(when+dur+.03);musicNodes.push(o);}
+function scheduleBar(){if(!audioCtx||cfg.music==='off'||cfg.mute)return;const t=audioCtx.currentTime+.05,beat=.48,scale=[261.63,293.66,329.63,392,440,523.25,587.33];
+ if(cfg.music==='relax'){[0,3,5].forEach((n,i)=>mTone(scale[n],1.85,'sine',.20,t+i*.02));[0,2,4,2].forEach((n,i)=>mTone(scale[n]/2,1.7,'triangle',.14,t+i*beat));[4,5,3,2].forEach((n,i)=>mTone(scale[n]*2,.28,'sine',.08,t+i*beat+.12));}
+ else if(cfg.music==='electro'){const ar=[0,2,4,6,4,2,5,3];ar.forEach((n,i)=>mTone(scale[n],.20,'sawtooth',.09,t+i*beat/2));mTone(65,.16,'square',.18,t);mTone(65,.12,'square',.13,t+beat*2);}
+ else {mTone(65,.22,'sine',.25,t);mTone(65,.18,'sine',.18,t+beat*2);mTone(220,.10,'square',.10,t+beat);mTone(220,.10,'square',.08,t+beat*3);[0,2,4,2].forEach((n,i)=>mTone(scale[n]/2,.22,'triangle',.12,t+i*beat));}
+}
+function stopBuiltInMusic(){if(musicTimer){clearInterval(musicTimer);musicTimer=null;}musicStep=0;musicNodes.forEach(o=>{try{o.stop();}catch(e){}});musicNodes=[];}
+function playMusic(){ensureMusic();stopBuiltInMusic();if(customAudio){customAudio.pause();customAudio.currentTime=0;customAudio=null;}if(cfg.music==='off'||cfg.mute){setMusicGain();return;}if(cfg.music.startsWith('custom:')){const tr=customTracks.find(x=>x.id===cfg.music.slice(7));if(tr){customAudio=new Audio(tr.url);customAudio.loop=true;customAudio.volume=cfg.mute?0:Math.max(0,Math.min(1,cfg.volume/100));customAudio.play().catch(()=>{});}return;}scheduleBar();musicTimer=setInterval(scheduleBar,1800);setMusicGain();}
+function applyAudio(){if(musicMaster)setMusicGain();if(customAudio)customAudio.volume=cfg.mute?0:Math.max(0,Math.min(1,cfg.volume/100));playMusic();}
+function renderCustomMusic(){['customMusicList','customMusicListM'].forEach(id=>{const el=document.getElementById(id);if(!el)return;el.innerHTML=customTracks.length?customTracks.map(t=>`<div style="display:flex;gap:5px;align-items:center;margin:3px 0"><button type="button" class="btn ghost" data-playcustom="${t.id}" style="padding:4px 8px;font-size:9px">${t.name}</button><button type="button" class="btn ghost" data-delcustom="${t.id}" style="padding:4px 8px;font-size:9px">×</button></div>`).join(''):'<small style="opacity:.45">Nenhuma música adicionada.</small>';});}
+function addCustomFiles(files){[...files].forEach(file=>{const id='c'+Date.now()+Math.random().toString(36).slice(2);customTracks.push({id,name:file.name.replace(/\.[^.]+$/,''),url:URL.createObjectURL(file)});});renderCustomMusic();}
 const _oldUpdateBoost=updateBoost; updateBoost=function(){const was=boosting;_oldUpdateBoost();if(boosting!==was){if(boosting)soundTurbo(true);else soundTurbo(false);}};
 
 /* ══════════════════════════════════════
@@ -1494,21 +1532,15 @@ function drawW(w,ocx,ocy,z){
     cx.font='bold 12px Rajdhani,sans-serif';
     cx.fillStyle=(w.isp||w.human)?'#3df2c8':'rgba(255,255,255,.72)';
     cx.textAlign='center';
-    cx.fillText(w.name,hsx,hsy-hr-7);
+    cx.fillText(trText(w.name),hsx,hsy-hr-7);
   }
 }
 
+function drawWallpaper(){const wp=cfg.wallpaper||'grid';const size=110;const offX=((W/2-player.x*z)%size+size)%size,offY=((H/2-player.y*z)%size+size)%size;cx.save();cx.fillStyle=wp==='earth'?'#3d3325':wp==='blue'?'#142b3b':wp==='paper'?'#b8a77d':wp==='leaves'?'#16351f':'#060a0d';cx.fillRect(0,0,W,H);if(wp==='grid'){cx.strokeStyle='rgba(255,255,255,.024)';cx.lineWidth=1;cx.beginPath();for(let x=offX;x<W;x+=size){cx.moveTo(x,0);cx.lineTo(x,H);}for(let y=offY;y<H;y+=size){cx.moveTo(0,y);cx.lineTo(W,y);}cx.stroke();}else{const s=wp==='paper'?34:wp==='earth'?70:wp==='blue'?85:58;for(let x=-s+((offX)%s);x<W+s;x+=s)for(let y=-s+((offY)%s);y<H+s;y+=s){if(wp==='leaves'){cx.fillStyle='rgba(85,170,100,.16)';cx.beginPath();cx.ellipse(x,y,7,15,(x+y)*.01,0,Math.PI*2);cx.fill();}else if(wp==='earth'){cx.fillStyle='rgba(210,170,105,.12)';cx.beginPath();cx.arc(x+Math.sin(y)*9,y+Math.cos(x)*7,2.5,0,Math.PI*2);cx.fill();}else if(wp==='paper'){cx.strokeStyle='rgba(70,55,35,.16)';cx.strokeRect(x,y,s,s);}else{cx.fillStyle='rgba(80,180,220,.10)';cx.beginPath();cx.arc(x,y,2.2,0,Math.PI*2);cx.fill();}}}cx.restore();}
 function render(){
   cx.clearRect(0,0,W,H);
   const ocx=player.x,ocy=player.y,z=getZ();
-  cx.fillStyle='#060a0d';cx.fillRect(0,0,W,H);
-  // grid
-  cx.strokeStyle='rgba(255,255,255,.024)';cx.lineWidth=1;
-  const gs=150*z,ox=((W/2-ocx*z)%gs+gs)%gs,oy=((H/2-ocy*z)%gs+gs)%gs;
-  cx.beginPath();
-  for(let x=ox;x<W;x+=gs){cx.moveTo(x,0);cx.lineTo(x,H);}
-  for(let y=oy;y<H;y+=gs){cx.moveTo(0,y);cx.lineTo(W,y);}
-  cx.stroke();
+  drawWallpaper();
   // borda
   const epx=W/2-ocx*z,epy=H/2-ocy*z,pul=1+Math.sin(el*1.8)*.005;
   cx.beginPath();cx.arc(epx,epy,WR*z*pul,0,Math.PI*2);
@@ -1589,7 +1621,7 @@ function hudUpdate(dt){
   top.forEach((w,i)=>{
     const li=document.createElement('li');
     if(w===player)li.className='me';
-    li.innerHTML=`<span>${i+1}. ${w.name}</span><span>${Math.floor(w.len)}</span>`;
+    li.innerHTML=`<span>${i+1}. ${trText(w.name)}</span><span>${Math.floor(w.len)}</span>`;
     lbLEl.appendChild(li);
   });
 }
@@ -1676,7 +1708,7 @@ const I18N={
     'Joystick':'Joystick','Lado do analógico de direção':'Lado del joystick de dirección','Esq':'Izq','Dir':'Der','Minimapa':'Minimapa','Mapa no canto':'Mapa en la esquina','JOGAR':'JUGAR',
     'VOCÊ CAIU':'CAÍSTE','Registre seu nome no Hall da Fama:':'Registra tu nombre en el Salón de la Fama:','Escreva um nome para continuar.':'Escribe un nombre para continuar.','SALVAR':'GUARDAR',
     'Derrubados':'Derribados','Posição':'Posición','JOGAR DE NOVO':'JUGAR DE NUEVO','MENU':'MENÚ','PAUSADO':'PAUSADO','Toque em continuar para voltar':'Pulsa continuar para volver','▶ CONTINUAR':'▶ CONTINUAR','VOLTAR':'VOLVER','Nenhum recorde ainda.':'Aún no hay récords.',
-    'Idioma':'Idioma','Idioma do jogo':'Idioma del juego'
+    'Idioma':'Idioma','Idioma do jogo':'Idioma del juego','Clássica':'Clásica','Cobra':'Serpiente','Tanque':'Tanque','Raio':'Rayo','Pixel Snake':'Serpiente Pixel','Serpente Longa':'Serpiente Larga','Enguia':'Anguila','Centopeia':'Ciempiés','Escorpião':'Escorpión','Lagarto':'Lagarto','Fantasma':'Fantasma','Cobra de Cerco':'Serpiente de Cerco','Lagarta':'Oruga','Cercador':'Cercador','Cercador Especial':'Cercador Especial','Comprida/fina':'Larga/delgada','Grossa/curta':'Gruesa/corta','Fina/veloz':'Fina/rápida','Quadrada · só 90°':'Cuadrada · solo 90°','Muito corpo · excelente para cercar':'Mucho cuerpo · excelente para cercar','Curvas suaves · escapa de cercos':'Curvas suaves · escapa de cercos','Muitos segmentos · domina espaço':'Muchos segmentos · domina espacio','Cauda longa · protege a traseira':'Cola larga · protege la espalda','Cabeça rápida · cauda pesada':'Cabeza rápida · cola pesada','Leve e veloz · passa por alimento':'Ligera y veloz · pasa por la comida','Feita para fechar círculos':'Hecha para cerrar círculos','Pesada · resistente · território':'Pesada · resistente · territorio','Cresce, cerca e se alimenta dos derrotados':'Crece, rodea y se alimenta de los derrotados','Especialista de cerco do território externo':'Especialista de cerco del territorio exterior','Balanceada':'Equilibrada','Música':'Música','Estilo da trilha':'Estilo de la música','Sem música':'Sin música','Relaxante':'Relajante','Eletrônica':'Electrónica','Hip-Hop':'Hip-Hop','Volume':'Volumen','Som e música':'Sonido y música','Jogo mudo':'Juego mudo','Desliga todos os sons':'Desactiva todos los sonidos','Tela deitada':'Pantalla horizontal','Celular em modo horizontal':'Móvil en modo horizontal','Chão / papel de parede':'Suelo / fondo','Você caminha sobre o desenho':'Caminas sobre el dibujo','Grade':'Cuadrícula','Papel':'Papel','Terra':'Tierra','Azul':'Azul','Folhas':'Hojas','Minhas músicas':'Mis músicas','Arquivos de áudio ficam somente neste navegador':'Los archivos de audio quedan solo en este navegador'
   }
 };
 function applyLanguage(){
@@ -1698,7 +1730,9 @@ function setupLanguage(){
    BOOT
 ══════════════════════════════════════ */
 setupLanguage();
+wireAudioUI();
 syncUI();
+playMusic();
 layout();
 drawAllHalls();
 buildSkins();renderColorUI();
