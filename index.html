@@ -815,9 +815,10 @@ function bindHostConnection(conn){
     netReady=true;
     netMsg('JOGADOR CONECTADO. Aperte JOGAR.','ok');
     setBadge();
+    try{conn.send({type:'room-ready',room:netPeer?.id||''});}catch(e){}
     sendSnap(true);
   });
-  conn.on('data',m=>{if(m?.type==='input')netInput=m;});
+  conn.on('data',m=>{if(m?.type==='input')netInput=m;if(m?.type==='join-hello')netMsg('JOGADOR CONFIRMOU A ENTRADA. Aperte JOGAR.','ok');});
   conn.on('close',()=>{
     clearTimeout(watch);
     netReady=false;
@@ -837,7 +838,8 @@ function bindHostConnection(conn){
 let guestRetryTimer=null,guestRetryCount=0;
 function connectGuestToHost(){
   if(netRole!=='guest'||!netPeer||netPeer.destroyed)return;
-  const code=roomCodeEl.value.trim();
+  const code=roomCodeEl.value.trim().toUpperCase();
+  roomCodeEl.value=code;
   if(!code){
     netMsg('Digite o código da sala.','err');
     netRole='solo';
@@ -853,9 +855,9 @@ function connectGuestToHost(){
   netMsg('Chamando a sala '+code+'...','wait');
 
   const conn=netPeer.connect(code,{
-    reliable:false,
+    reliable:true,
     serialization:'json',
-    metadata:{game:'minhocas-io',version:'v26'}
+    metadata:{game:'minhocas-io',version:'v28'}
   });
   netConn=conn;
 
@@ -874,9 +876,10 @@ function connectGuestToHost(){
     netRemoteId=code;
     netMsg('CONECTADO À SALA. Aperte JOGAR.','ok');
     setBadge();
+    try{conn.send({type:'join-hello',name:document.getElementById('pName').value.trim()||'Você'});}catch(e){}
     sendInput(true);
   });
-  conn.on('data',m=>{if(m?.type==='snapshot')applySnapshot(m);});
+  conn.on('data',m=>{if(m?.type==='room-ready')netMsg('SALA CONFIRMADA. Aperte JOGAR.','ok');if(m?.type==='snapshot')applySnapshot(m);});
   conn.on('close',()=>{
     clearTimeout(watch);
     netReady=false;
@@ -908,7 +911,8 @@ function setupHost(){
 }
 
 function setupGuest(){
-  const code=roomCodeEl.value.trim();
+  const code=roomCodeEl.value.trim().toUpperCase();
+  roomCodeEl.value=code;
   if(!code){
     netMsg('Digite o código da sala.','err');
     return;
@@ -942,7 +946,7 @@ function startLocalRoomTest(code){
   localTestPeer=makeNetPeer();
   localTestPeer.on('open',()=>{
     console.log('[MINHOCAS.IO] Cliente auxiliar aberto:',localTestPeer.id,'->',code);
-    localTestConn=localTestPeer.connect(code,{reliable:false,serialization:'json',metadata:{game:'minhocas-io',version:'v26-local-test'}});
+    localTestConn=localTestPeer.connect(code,{reliable:true,serialization:'json',metadata:{game:'minhocas-io',version:'v28-local-test'}});
     localTestConn.on('open',()=>{
       netMsg('ENTROU NA SALA! Teste local concluído. A sala está ativa.','ok');
       setBadge();
@@ -1957,7 +1961,7 @@ function showMenu(){
 document.getElementById('hostBtn').addEventListener('click',setupHost);
 document.getElementById('joinBtn').addEventListener('click',setupGuest);
 document.getElementById('soloBtn').addEventListener('click',()=>{resetNet();netMsg('Modo sozinho selecionado.');startGame();});
-roomCodeEl.addEventListener('input',()=>{roomCodeEl.value=roomCodeEl.value.replace(/[^A-Za-z0-9_-]/g,'');});
+roomCodeEl.addEventListener('input',()=>{roomCodeEl.value=roomCodeEl.value.replace(/[^A-Za-z0-9]/g,'').toUpperCase().slice(0,6);});
 roomCodeEl.addEventListener('keydown',e=>{if(e.key==='Enter')setupGuest();});
 window.addEventListener('beforeunload',()=>{try{if(netPeer)netPeer.destroy();}catch(e){}});
 
