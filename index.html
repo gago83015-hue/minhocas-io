@@ -735,7 +735,13 @@ function watchNetPeer(peer,role){
   });
   peer.on('disconnected',()=>{
     netReconnectBusy=false;
-    netMsg('Servidor de salas desconectou. Tentando reconectar...','wait');
+    // PeerJS pode emitir "error: network" imediatamente antes de
+    // "disconnected". Não sobrescrevemos o erro real com uma mensagem genérica.
+    if(netLastError){
+      netMsg('Conexão com o servidor falhou: '+netLastError,'err');
+    }else{
+      netMsg('Servidor de salas desconectou. Tentando reconectar...','wait');
+    }
     armNetReconnect();
   });
   peer.on('close',()=>{
@@ -747,7 +753,8 @@ function watchNetPeer(peer,role){
     console.error('[MINHOCAS.IO PeerJS]',e);
     if(role==='guest'){
       if(code.startsWith('peer-unavailable'))netMsg('Sala não encontrada. Confira o código e tente novamente.','err');
-      else if(code.startsWith('network')||code.startsWith('socket-error')||code.startsWith('socket-closed'))netMsg('Falha de rede no servidor de salas: '+code,'err');
+      else if(code.startsWith('network'))netMsg('O navegador perdeu a conexão com o servidor de salas: '+code,'err');
+      else if(code.startsWith('socket-error')||code.startsWith('socket-closed'))netMsg('O WebSocket do servidor de salas falhou: '+code,'err');
       else if(code.startsWith('ssl-unavailable'))netMsg('O servidor de salas recusou a conexão segura (SSL).','err');
       else if(code.startsWith('webrtc'))netMsg('O navegador não conseguiu criar a conexão WebRTC: '+code,'err');
       else if(code.startsWith('browser-incompatible'))netMsg('Este navegador não suporta WebRTC para o multiplayer.','err');
