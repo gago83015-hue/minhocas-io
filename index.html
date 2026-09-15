@@ -196,7 +196,7 @@ body.cursor-free .ti{cursor:text!important;}
 #netBox .nt{font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:1.5px;color:var(--mint);margin-bottom:7px;}
 .netrow{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;}
 .netrow .btn{flex:1;min-width:125px;padding:9px 10px;font-size:10px;}
-#roomCode{width:220px;min-width:220px;box-sizing:border-box;text-align:center;letter-spacing:1px;font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;text-transform:none;padding:6px 5px;overflow:visible;}
+#roomCode{width:125px;min-width:125px;box-sizing:border-box;text-align:center;letter-spacing:3px;font-family:'Orbitron',sans-serif;font-size:14px;font-weight:800;text-transform:uppercase;padding:6px 5px;overflow:visible;}
 #roomJoin{display:flex;gap:7px;margin-top:7px;}
 #roomJoin .ti{flex:1;text-align:center;text-transform:uppercase;letter-spacing:2px;}
 #roomJoin .btn{padding:8px 15px;font-size:10px;}
@@ -259,7 +259,7 @@ body.cursor-free .ti{cursor:text!important;}
       <button class="btn ghost" id="soloBtn">JOGAR SOZINHO</button>
     </div>
     <div id="roomJoin">
-      <input class="ti" id="roomCode" maxlength="24" autocomplete="off" placeholder="CÓDIGO">
+      <input class="ti" id="roomCode" maxlength="6" autocomplete="off" placeholder="CÓDIGO">
       <button class="btn ghost" id="joinBtn">ENTRAR</button>
     </div>
     <div id="netStatus">Crie uma sala e envie o código para a pessoa que vai jogar com você.</div>
@@ -676,16 +676,15 @@ const mpBadge=document.getElementById('mpBadge'),netStatus=document.getElementBy
 function netMsg(text,kind=''){netStatus.textContent=text;netStatus.className=kind;}
 function setBadge(){if(netRole==='solo'){mpBadge.style.display='none';return;}mpBadge.style.display='block';mpBadge.textContent=netRole==='host'?'SALA: '+(netPeer?.id||'')+' · 2 JOGADORES':'MULTIJOGADOR · CONECTADO';}
 function resetNet(){try{if(netConn)netConn.close();}catch(e){}try{if(netPeer)netPeer.destroy();}catch(e){}try{if(localTestConn)localTestConn.close();}catch(e){}try{if(localTestPeer)localTestPeer.destroy();}catch(e){}netConn=null;netPeer=null;localTestConn=null;localTestPeer=null;netReady=false;netRemoteId=null;netRole='solo';mpBadge.style.display='none';}
-function makeRoomCode(){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let out='';for(let i=0;i<10;i++)out+=chars[Math.floor(Math.random()*chars.length)];return out;}
+function makeRoomCode(){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let out='';for(let i=0;i<6;i++)out+=chars[Math.floor(Math.random()*chars.length)];return out;}
 function snapshot(){return {type:'snapshot',worms:worms.map(w=>({id:w.id,name:w.name,x:w.x,y:w.y,ang:w.ang,len:w.len,alive:w.alive,isp:!!w.isp,human:!!w.human,col:w.col,colD:w.colD,skin:w.skin?.id||'normal',customPaint:w.customPaint||null,k:w.k||0,path:w.path.filter((_,i)=>i<180&&i%4===0).map(p=>[Math.round(p.x*10)/10,Math.round(p.y*10)/10])}))};}
 function applySnapshot(msg){if(!msg.worms)return;const localId=player?.id,map=new Map();for(const d of msg.worms){let w=wById.get(d.id);if(!w){const sk=(SKINS.concat(SPECIAL_SKINS)).find(x=>x.id===d.skin)||SKINS[0];w={id:d.id,isp:!!d.isp,human:!!d.human,name:d.name||'Jogador',x:d.x,y:d.y,ang:d.ang,da:d.ang,bo:false,len:d.len,path:[],alive:d.alive,col:d.col,colD:d.colD,skin:sk,k:d.k||0,agg:0,aiT:1,aiSt:'w',hId:-1,fId:-1,wA:d.ang,rT:0};}Object.assign(w,{x:d.x,y:d.y,ang:d.ang,da:d.ang,len:d.len,alive:d.alive,name:d.name||w.name,col:d.col||w.col,colD:d.colD||w.colD,customPaint:d.customPaint||w.customPaint,k:d.k||0,human:!!d.human,isp:!!d.isp});w.path=(d.path||[]).map(p=>({x:p[0],y:p[1]}));if(!w.path.length)for(let i=0;i<60;i++)w.path.push({x:w.x-Math.cos(w.ang)*i*SGAP,y:w.y-Math.sin(w.ang)*i*SGAP});map.set(w.id,w);}worms=[...map.values()];wById=map;if(localId&&map.has(localId)){player=map.get(localId);player.isp=true;}else if(netRole==='guest'&&player&&player.alive){player.isp=true;worms.unshift(player);wById.set(player.id,player);}if(player&&!player.alive&&running)onDeath(null);}
 function sendInput(force=false){if(!netConn||!netConn.open)return;const now=performance.now();if(!force&&now-netSendT<1000/NET_HZ)return;netSendT=now;try{const pc=paintForPlayer();netConn.send({type:'input',clientId:player?.id,x:joyV.x,y:joyV.y,active:joyA,boost:boosting,name:document.getElementById('pName').value.trim()||'Você',col:pc.col,colD:pc.colD,rainbow:!!pc.rainbow,skinId:cfg.skinId,customPaint:Array.isArray(cfg.customPaint)?cfg.customPaint.slice(0,12):[]});}catch(e){}}
 function sendSnap(){if(netRole!=='host'||!netConn||!netConn.open)return;const now=performance.now();if(now-netSnapT<1000/NET_HZ)return;netSnapT=now;try{netConn.send(snapshot());}catch(e){}}
-function makeNetPeer(){
-  // v22: usamos a configuração oficial padrão do PeerJS.
-  // A própria biblioteca já fornece a configuração ICE/TURN adequada.
-  // Não sobrescrevemos host, SSL ou servidores ICE.
-  return new Peer(undefined,{debug:3,pingInterval:5000});
+function makeNetPeer(id){
+  // O código visível da sala agora é o próprio ID curto do PeerJS.
+  // Assim o jogador só precisa digitar 6 caracteres no outro aparelho.
+  return new Peer(id || undefined,{debug:3,pingInterval:5000});
 }
 let netReconnectTimer=null, netReconnectBusy=false, netLastError='';
 // Cliente auxiliar usado quando o próprio navegador cria e testa a sala.
@@ -750,6 +749,13 @@ function watchNetPeer(peer,role){
 
   peer.on('error',e=>{
     const code=netErrorText(e);
+    if(role==='host'&&e?.type==='unavailable-id'){
+      netMsg('Código ocupado. Gerando outro código...','wait');
+      try{peer.destroy();}catch(err){}
+      if(netPeer===peer){netPeer=null;}
+      setTimeout(()=>{if(netRole==='host')createHostPeer();},250);
+      return;
+    }
     console.error('[MINHOCAS.IO PeerJS ERROR]',code,e);
     if(code.startsWith('peer-unavailable')){
       netMsg('ERRO: esse código de sala não está ativo.','err');
@@ -835,7 +841,7 @@ function connectGuestToHost(){
   const conn=netPeer.connect(code,{
     reliable:false,
     serialization:'json',
-    metadata:{game:'minhocas-io',version:'v23'}
+    metadata:{game:'minhocas-io',version:'v26'}
   });
   netConn=conn;
 
@@ -872,12 +878,18 @@ function connectGuestToHost(){
   });
 }
 
+function createHostPeer(){
+  const shortCode=makeRoomCode();
+  netMsg('Criando código '+shortCode+'...','wait');
+  netPeer=makeNetPeer(shortCode);
+  watchNetPeer(netPeer,'host');
+}
+
 function setupHost(){
   resetNet();
   netRole='host';
   netMsg('Preparando sala online...','wait');
-  netPeer=makeNetPeer();
-  watchNetPeer(netPeer,'host');
+  createHostPeer();
 }
 
 function setupGuest(){
@@ -913,7 +925,7 @@ function startLocalRoomTest(code){
   localTestPeer=makeNetPeer();
   localTestPeer.on('open',()=>{
     console.log('[MINHOCAS.IO] Cliente auxiliar aberto:',localTestPeer.id,'->',code);
-    localTestConn=localTestPeer.connect(code,{reliable:false,serialization:'json',metadata:{game:'minhocas-io',version:'v23-local-test'}});
+    localTestConn=localTestPeer.connect(code,{reliable:false,serialization:'json',metadata:{game:'minhocas-io',version:'v26-local-test'}});
     localTestConn.on('open',()=>{
       netMsg('ENTROU NA SALA! Teste local concluído. A sala está ativa.','ok');
       setBadge();
