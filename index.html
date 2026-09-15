@@ -684,7 +684,7 @@ function sendSnap(){if(netRole!=='host'||!netConn||!netConn.open)return;const no
 function makeNetPeer(id){
   // O código visível da sala agora é o próprio ID curto do PeerJS.
   // Assim o jogador só precisa digitar 6 caracteres no outro aparelho.
-  return new Peer(id || undefined,{debug:3,pingInterval:5000});
+  return new Peer(id || undefined,{debug:3,pingInterval:5000,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}],sdpSemantics:'unified-plan'}});
 }
 let netReconnectTimer=null, netReconnectBusy=false, netLastError='';
 // Cliente auxiliar usado quando o próprio navegador cria e testa a sala.
@@ -758,7 +758,19 @@ function watchNetPeer(peer,role){
     }
     console.error('[MINHOCAS.IO PeerJS ERROR]',code,e);
     if(code.startsWith('peer-unavailable')){
-      netMsg('ERRO: esse código de sala não está ativo.','err');
+      if(role==='guest' && netRole==='guest' && guestRetryCount<8){
+        guestRetryCount++;
+        netMsg('Sala ainda não respondeu. Tentando novamente ('+guestRetryCount+'/8)...','wait');
+        try{peer.destroy();}catch(err){}
+        if(netPeer===peer){netPeer=null;}
+        guestRetryTimer=setTimeout(()=>{
+          if(netRole!=='guest')return;
+          netPeer=makeNetPeer();
+          watchNetPeer(netPeer,'guest');
+        },1500);
+      }else{
+        netMsg('ERRO: esse código de sala não está ativo.','err');
+      }
     }else if(code.startsWith('network')){
       netMsg('ERRO NETWORK: não foi possível falar com o servidor PeerJS.','err');
     }else if(code.startsWith('socket-error')){
@@ -822,6 +834,7 @@ function bindHostConnection(conn){
   });
 }
 
+let guestRetryTimer=null,guestRetryCount=0;
 function connectGuestToHost(){
   if(netRole!=='guest'||!netPeer||netPeer.destroyed)return;
   const code=roomCodeEl.value.trim();
@@ -836,7 +849,8 @@ function connectGuestToHost(){
     netConn=null;
   }
 
-  netMsg('Chamando o anfitrião pelo código '+code+'...','wait');
+  if(guestRetryTimer){clearTimeout(guestRetryTimer);guestRetryTimer=null;}
+  netMsg('Chamando a sala '+code+'...','wait');
 
   const conn=netPeer.connect(code,{
     reliable:false,
@@ -847,7 +861,7 @@ function connectGuestToHost(){
 
   const watch=setTimeout(()=>{
     if(netConn===conn&&!conn.open){
-      netMsg('O código foi localizado, mas o WebRTC não abriu em 20 segundos.','err');
+      netMsg('A sala foi encontrada, mas a conexão entre os aparelhos não abriu.','err');
       try{conn.close();}catch(e){}
       netConn=null;
       netReady=false;
@@ -886,6 +900,7 @@ function createHostPeer(){
 }
 
 function setupHost(){
+  if(guestRetryTimer){clearTimeout(guestRetryTimer);guestRetryTimer=null;}
   resetNet();
   netRole='host';
   netMsg('Preparando sala online...','wait');
@@ -910,8 +925,10 @@ function setupGuest(){
   }
 
   resetNet();
+  guestRetryCount=0;
+  if(guestRetryTimer){clearTimeout(guestRetryTimer);guestRetryTimer=null;}
   netRole='guest';
-  netMsg('Conectando ao PeerJS...','wait');
+  netMsg('Conectando ao servidor da sala...','wait');
   netPeer=makeNetPeer();
   watchNetPeer(netPeer,'guest');
 }
