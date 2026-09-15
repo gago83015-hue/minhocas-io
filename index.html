@@ -681,12 +681,35 @@ function snapshot(){return {type:'snapshot',worms:worms.map(w=>({id:w.id,name:w.
 function applySnapshot(msg){if(!msg.worms)return;const localId=player?.id,map=new Map();for(const d of msg.worms){let w=wById.get(d.id);if(!w){const sk=(SKINS.concat(SPECIAL_SKINS)).find(x=>x.id===d.skin)||SKINS[0];w={id:d.id,isp:!!d.isp,human:!!d.human,name:d.name||'Jogador',x:d.x,y:d.y,ang:d.ang,da:d.ang,bo:false,len:d.len,path:[],alive:d.alive,col:d.col,colD:d.colD,skin:sk,k:d.k||0,agg:0,aiT:1,aiSt:'w',hId:-1,fId:-1,wA:d.ang,rT:0};}Object.assign(w,{x:d.x,y:d.y,ang:d.ang,da:d.ang,len:d.len,alive:d.alive,name:d.name||w.name,col:d.col||w.col,colD:d.colD||w.colD,customPaint:d.customPaint||w.customPaint,k:d.k||0,human:!!d.human,isp:!!d.isp});w.path=(d.path||[]).map(p=>({x:p[0],y:p[1]}));if(!w.path.length)for(let i=0;i<60;i++)w.path.push({x:w.x-Math.cos(w.ang)*i*SGAP,y:w.y-Math.sin(w.ang)*i*SGAP});map.set(w.id,w);}worms=[...map.values()];wById=map;if(localId&&map.has(localId)){player=map.get(localId);player.isp=true;}else if(netRole==='guest'&&player&&player.alive){player.isp=true;worms.unshift(player);wById.set(player.id,player);}if(player&&!player.alive&&running)onDeath(null);}
 function sendInput(force=false){if(!netConn||!netConn.open)return;const now=performance.now();if(!force&&now-netSendT<1000/NET_HZ)return;netSendT=now;try{const pc=paintForPlayer();netConn.send({type:'input',clientId:player?.id,x:joyV.x,y:joyV.y,active:joyA,boost:boosting,name:document.getElementById('pName').value.trim()||'Você',col:pc.col,colD:pc.colD,rainbow:!!pc.rainbow,skinId:cfg.skinId,customPaint:Array.isArray(cfg.customPaint)?cfg.customPaint.slice(0,12):[]});}catch(e){}}
 function sendSnap(){if(netRole!=='host'||!netConn||!netConn.open)return;const now=performance.now();if(now-netSnapT<1000/NET_HZ)return;netSnapT=now;try{netConn.send(snapshot());}catch(e){}}
+function makeNetPeer(){
+  const opts={
+    host:'0.peerjs.com',
+    port:443,
+    path:'/',
+    secure:true,
+    debug:1,
+    pingInterval:5000,
+    config:{iceServers:[
+      {urls:'stun:stun.l.google.com:19302'},
+      {urls:'stun:stun1.l.google.com:19302'}
+    ],sdpSemantics:'unified-plan'}
+  };
+  return new Peer(undefined,opts);
+}
+let netReconnectTimer=null, netReconnectBusy=false;
+function armNetReconnect(){
+  if(netReconnectTimer)clearTimeout(netReconnectTimer);
+  netReconnectTimer=setTimeout(()=>{
+    if(netPeer&&!netPeer.destroyed&&netPeer.disconnected){
+      try{netPeer.reconnect();netMsg('Reconectando ao servidor de salas...','wait');}catch(e){}
+    }
+  },900);
+}
 function setupHost(){
   resetNet();
   netRole='host';
   netMsg('Preparando sala online...','wait');
-  const opts={debug:1,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'}],sdpSemantics:'unified-plan'}};
-  netPeer=new Peer(undefined,opts);
+  netPeer=makeNetPeer();
   netPeer.on('open',id=>{
     roomCodeEl.value=id;
     roomCodeEl.select();
@@ -706,7 +729,7 @@ function setupHost(){
     netMsg(msg==='network'?'Falha de rede ao criar a sala.':msg==='server-error'?'Servidor online indisponível no momento.':'Não foi possível criar a sala. Tente novamente.','err');
     console.error(e);
   });
-  netPeer.on('disconnected',()=>netMsg('Conexão com o servidor de salas foi perdida.','err'));
+  netPeer.on('disconnected',()=>{netMsg('Conexão temporária com o servidor. Tentando reconectar...','wait');armNetReconnect();});
 }
 function setupGuest(){
   resetNet();
@@ -714,8 +737,7 @@ function setupGuest(){
   const code=roomCodeEl.value.trim();
   if(!code){netMsg('Digite o código da sala.','err');netRole='solo';return;}
   netMsg('Conectando à sala...','wait');
-  const opts={debug:1,config:{iceServers:[{urls:'stun:stun.l.google.com:19302'}],sdpSemantics:'unified-plan'}};
-  netPeer=new Peer(undefined,opts);
+  netPeer=makeNetPeer();
   netPeer.on('open',()=>{
     netConn=netPeer.connect(code,{reliable:true,serialization:'json'});
     netConn.on('open',()=>{netReady=true;netMsg('Conectado ao anfitrião. Aperte JOGAR.','ok');setBadge();sendInput(true);});
@@ -730,7 +752,7 @@ function setupGuest(){
     else netMsg('Não foi possível entrar na sala. Código: '+msg,'err');
     console.error(e);
   });
-  netPeer.on('disconnected',()=>netMsg('Conexão com o servidor foi perdida.','err'));
+  netPeer.on('disconnected',()=>{netMsg('Conexão temporária com o servidor. Tentando reconectar...','wait');armNetReconnect();});
 }
       // bodies cache (reaproveitado por frame)
 const _pk=[];      // pending kills
