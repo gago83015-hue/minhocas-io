@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Minhocas.io</title>
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.5/dist/peerjs.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;800&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -682,79 +682,141 @@ function applySnapshot(msg){if(!msg.worms)return;const localId=player?.id,map=ne
 function sendInput(force=false){if(!netConn||!netConn.open)return;const now=performance.now();if(!force&&now-netSendT<1000/NET_HZ)return;netSendT=now;try{const pc=paintForPlayer();netConn.send({type:'input',clientId:player?.id,x:joyV.x,y:joyV.y,active:joyA,boost:boosting,name:document.getElementById('pName').value.trim()||'Você',col:pc.col,colD:pc.colD,rainbow:!!pc.rainbow,skinId:cfg.skinId,customPaint:Array.isArray(cfg.customPaint)?cfg.customPaint.slice(0,12):[]});}catch(e){}}
 function sendSnap(){if(netRole!=='host'||!netConn||!netConn.open)return;const now=performance.now();if(now-netSnapT<1000/NET_HZ)return;netSnapT=now;try{netConn.send(snapshot());}catch(e){}}
 function makeNetPeer(){
-  const opts={
-    host:'0.peerjs.com',
-    port:443,
-    path:'/',
-    secure:true,
-    debug:1,
+  // PeerJS Cloud: usar as configurações padrão do serviço evita conflito
+  // entre host/path/SSL definidos manualmente e a configuração atual do Cloud.
+  return new Peer(undefined,{
+    debug:3,
     pingInterval:5000,
-    config:{iceServers:[
-      {urls:'stun:stun.l.google.com:19302'},
-      {urls:'stun:stun1.l.google.com:19302'}
-    ],sdpSemantics:'unified-plan'}
-  };
-  return new Peer(undefined,opts);
+    config:{
+      iceServers:[
+        {urls:'stun:stun.l.google.com:19302'},
+        {urls:'stun:stun1.l.google.com:19302'}
+      ],
+      sdpSemantics:'unified-plan'
+    }
+  });
 }
-let netReconnectTimer=null, netReconnectBusy=false;
+let netReconnectTimer=null, netReconnectBusy=false, netLastError='';
+function netErrorText(e){
+  const t=e?.type||'erro';
+  const m=e?.message||'';
+  netLastError=t+(m?': '+m:'');
+  return netLastError;
+}
 function armNetReconnect(){
   if(netReconnectTimer)clearTimeout(netReconnectTimer);
+  if(netReconnectBusy)return;
   netReconnectTimer=setTimeout(()=>{
     if(netPeer&&!netPeer.destroyed&&netPeer.disconnected){
-      try{netPeer.reconnect();netMsg('Reconectando ao servidor de salas...','wait');}catch(e){}
+      try{netReconnectBusy=true;netPeer.reconnect();netMsg('Reconectando ao servidor de salas...','wait');}
+      catch(e){netReconnectBusy=false;netMsg('Falha ao reconectar: '+netErrorText(e),'err');}
     }
-  },900);
+  },1200);
+}
+function watchNetPeer(peer,role){
+  peer.on('open',id=>{
+    netReconnectBusy=false;
+    netLastError='';
+    if(role==='host'){
+      roomCodeEl.value=id;
+      roomCodeEl.select();
+      netMsg('Sala criada. Envie exatamente este código para o outro jogador.','ok');
+      setBadge();
+    }else{
+      netMsg('Servidor de salas conectado. Procurando o anfitrião...','wait');
+      connectGuestToHost();
+    }
+  });
+  peer.on('disconnected',()=>{
+    netReconnectBusy=false;
+    netMsg('Servidor de salas desconectou. Tentando reconectar...','wait');
+    armNetReconnect();
+  });
+  peer.on('close',()=>{
+    netReconnectBusy=false;
+    if(netRole!=='solo')netMsg('Conexão com o servidor de salas foi encerrada.','err');
+  });
+  peer.on('error',e=>{
+    const code=netErrorText(e);
+    console.error('[MINHOCAS.IO PeerJS]',e);
+    if(role==='guest'){
+      if(code.startsWith('peer-unavailable'))netMsg('Sala não encontrada. Confira o código e tente novamente.','err');
+      else if(code.startsWith('network')||code.startsWith('socket-error')||code.startsWith('socket-closed'))netMsg('Falha de rede no servidor de salas: '+code,'err');
+      else if(code.startsWith('ssl-unavailable'))netMsg('O servidor de salas recusou a conexão segura (SSL).','err');
+      else netMsg('Falha no servidor de salas: '+code,'err');
+    }else{
+      if(code.startsWith('network')||code.startsWith('socket-error')||code.startsWith('socket-closed'))netMsg('Falha de rede ao criar a sala: '+code,'err');
+      else netMsg('Falha ao criar a sala: '+code,'err');
+    }
+  });
+}
+function bindHostConnection(conn){
+  if(netConn&&netConn.open){try{conn.close();}catch(e){}netMsg('A sala já está ocupada. Só 2 jogadores.','err');return;}
+  netConn=conn; netRemoteId=conn.peer;
+  netMsg('Conexão recebida. Estabelecendo jogo...','wait');
+  conn.on('open',()=>{
+    netReady=true;
+    netMsg('Jogador conectado. Aperte JOGAR.','ok');
+    setBadge();
+    sendSnap(true);
+  });
+  conn.on('data',m=>{if(m?.type==='input')netInput=m;});
+  conn.on('close',()=>{
+    netReady=false;netRemoteId=null;
+    netMsg('O outro jogador saiu da sala.','wait');
+    if(running&&netRole==='host')setBadge();
+  });
+  conn.on('error',e=>{
+    netReady=false;
+    netMsg('Erro na conexão com o outro jogador: '+netErrorText(e),'err');
+    console.error(e);
+  });
+}
+function connectGuestToHost(){
+  if(netRole!=='guest'||!netPeer||netPeer.destroyed)return;
+  const code=roomCodeEl.value.trim();
+  if(!code){netMsg('Digite o código da sala.','err');netRole='solo';return;}
+  if(netConn){try{netConn.close();}catch(e){}netConn=null;}
+  netMsg('Conectando ao anfitrião...','wait');
+  const conn=netPeer.connect(code,{reliable:true,serialization:'json',metadata:{game:'minhocas-io',version:'v18'}});
+  netConn=conn;
+  conn.on('open',()=>{
+    netReady=true;
+    netRemoteId=code;
+    netMsg('Conectado ao anfitrião. Aperte JOGAR.','ok');
+    setBadge();
+    sendInput(true);
+  });
+  conn.on('data',m=>{if(m?.type==='snapshot')applySnapshot(m);});
+  conn.on('close',()=>{
+    netReady=false;
+    netMsg('O anfitrião encerrou a sala.','err');
+    if(running)running=false;
+  });
+  conn.on('error',e=>{
+    netReady=false;
+    netMsg('A conexão com o anfitrião falhou: '+netErrorText(e),'err');
+    console.error(e);
+  });
 }
 function setupHost(){
   resetNet();
   netRole='host';
   netMsg('Preparando sala online...','wait');
   netPeer=makeNetPeer();
-  netPeer.on('open',id=>{
-    roomCodeEl.value=id;
-    roomCodeEl.select();
-    netMsg('Sala criada. Envie exatamente este código para o outro jogador.','ok');
-    setBadge();
-  });
-  netPeer.on('connection',conn=>{
-    if(netConn&&netConn.open){try{conn.close();}catch(e){} netMsg('A sala já está ocupada. Só 2 jogadores.','err');return;}
-    netConn=conn; netRemoteId=conn.peer;
-    conn.on('open',()=>{netReady=true;netMsg('Jogador conectado. Aperte JOGAR.','ok');setBadge();sendSnap(true);});
-    conn.on('data',m=>{if(m?.type==='input')netInput=m;});
-    conn.on('close',()=>{netReady=false;netRemoteId=null;netMsg('O outro jogador saiu da sala.','wait');});
-    conn.on('error',e=>{netReady=false;netMsg('Erro na conexão com o outro jogador.','err');console.error(e);});
-  });
-  netPeer.on('error',e=>{
-    const msg=e?.type||'erro';
-    netMsg(msg==='network'?'Falha de rede ao criar a sala.':msg==='server-error'?'Servidor online indisponível no momento.':'Não foi possível criar a sala. Tente novamente.','err');
-    console.error(e);
-  });
-  netPeer.on('disconnected',()=>{netMsg('Conexão temporária com o servidor. Tentando reconectar...','wait');armNetReconnect();});
+  watchNetPeer(netPeer,'host');
+  netPeer.on('connection',bindHostConnection);
 }
 function setupGuest(){
   resetNet();
   netRole='guest';
   const code=roomCodeEl.value.trim();
   if(!code){netMsg('Digite o código da sala.','err');netRole='solo';return;}
-  netMsg('Conectando à sala...','wait');
+  netMsg('Conectando ao servidor de salas...','wait');
   netPeer=makeNetPeer();
-  netPeer.on('open',()=>{
-    netConn=netPeer.connect(code,{reliable:true,serialization:'json'});
-    netConn.on('open',()=>{netReady=true;netMsg('Conectado ao anfitrião. Aperte JOGAR.','ok');setBadge();sendInput(true);});
-    netConn.on('data',m=>{if(m?.type==='snapshot')applySnapshot(m);});
-    netConn.on('close',()=>{netReady=false;netMsg('O anfitrião encerrou a sala.','err');if(running)running=false;});
-    netConn.on('error',e=>{netReady=false;netMsg('A conexão foi recusada ou caiu. Verifique o código.','err');console.error(e);});
-  });
-  netPeer.on('error',e=>{
-    const msg=e?.type||'erro';
-    if(msg==='peer-unavailable')netMsg('Sala não encontrada. Confira o código e tente novamente.','err');
-    else if(msg==='network'||msg==='server-error')netMsg('Não foi possível acessar o servidor de salas.','err');
-    else netMsg('Não foi possível entrar na sala. Código: '+msg,'err');
-    console.error(e);
-  });
-  netPeer.on('disconnected',()=>{netMsg('Conexão temporária com o servidor. Tentando reconectar...','wait');armNetReconnect();});
+  watchNetPeer(netPeer,'guest');
 }
-      // bodies cache (reaproveitado por frame)
+// bodies cache (reaproveitado por frame)
 const _pk=[];      // pending kills
 
 const NNAMES=[
