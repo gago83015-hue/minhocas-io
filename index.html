@@ -682,11 +682,25 @@ function applySnapshot(msg){if(!msg.worms)return;const localId=player?.id,map=ne
 function sendInput(force=false){if(!netConn||!netConn.open)return;const now=performance.now();if(!force&&now-netSendT<1000/NET_HZ)return;netSendT=now;try{const pc=paintForPlayer();netConn.send({type:'input',clientId:player?.id,x:joyV.x,y:joyV.y,active:joyA,boost:boosting,name:document.getElementById('pName').value.trim()||'Você',col:pc.col,colD:pc.colD,rainbow:!!pc.rainbow,skinId:cfg.skinId,customPaint:Array.isArray(cfg.customPaint)?cfg.customPaint.slice(0,12):[]});}catch(e){}}
 function sendSnap(){if(netRole!=='host'||!netConn||!netConn.open)return;const now=performance.now();if(now-netSnapT<1000/NET_HZ)return;netSnapT=now;try{netConn.send(snapshot());}catch(e){}}
 function makeNetPeer(){
-  // v19: NÃO sobrescrever a configuração ICE do PeerJS Cloud.
-  // A versão 1.5.5 já traz STUN + TURN próprios; sobrescrever 'config'
-  // remove esses servidores e pode impedir a conexão entre redes diferentes.
-  // Também deixamos host/porta/SSL no padrão oficial do PeerJS Cloud.
-  return new Peer();
+  // v20: configuração explícita e completa do PeerJS Cloud.
+  // Não dependemos do default da biblioteca: usamos STUN + os TURN oficiais
+  // do PeerJS, para funcionar também quando os dois jogadores estão atrás
+  // de NAT/rede que não permite conexão WebRTC direta.
+  return new Peer({
+    host:'0.peerjs.com',
+    port:443,
+    path:'/',
+    secure:true,
+    debug:3,
+    pingInterval:5000,
+    config:{
+      iceServers:[
+        {urls:'stun:stun.l.google.com:19302'},
+        {urls:['turn:eu-0.turn.peerjs.com:3478','turn:us-0.turn.peerjs.com:3478'],username:'peerjs',credential:'peerjsp'}
+      ],
+      sdpSemantics:'unified-plan'
+    }
+  });
 }
 let netReconnectTimer=null, netReconnectBusy=false, netLastError='';
 function netErrorText(e){
@@ -735,6 +749,8 @@ function watchNetPeer(peer,role){
       if(code.startsWith('peer-unavailable'))netMsg('Sala não encontrada. Confira o código e tente novamente.','err');
       else if(code.startsWith('network')||code.startsWith('socket-error')||code.startsWith('socket-closed'))netMsg('Falha de rede no servidor de salas: '+code,'err');
       else if(code.startsWith('ssl-unavailable'))netMsg('O servidor de salas recusou a conexão segura (SSL).','err');
+      else if(code.startsWith('webrtc'))netMsg('O navegador não conseguiu criar a conexão WebRTC: '+code,'err');
+      else if(code.startsWith('browser-incompatible'))netMsg('Este navegador não suporta WebRTC para o multiplayer.','err');
       else netMsg('Falha no servidor de salas: '+code,'err');
     }else{
       if(code.startsWith('network')||code.startsWith('socket-error')||code.startsWith('socket-closed'))netMsg('Falha de rede ao criar a sala: '+code,'err');
@@ -743,7 +759,7 @@ function watchNetPeer(peer,role){
   });
 }
 function bindHostConnection(conn){
-  if(netConn&&netConn.open){try{conn.close();}catch(e){}netMsg('A sala já está ocupada. Só 2 jogadores.','err');return;}
+  if(netConn){try{conn.close();}catch(e){}netMsg(netConn.open?'A sala já está ocupada. Só 2 jogadores.':'Já existe uma conexão tentando entrar. Aguarde alguns segundos.','err');return;}
   netConn=conn; netRemoteId=conn.peer;
   netMsg('Conexão recebida. Estabelecendo jogo...','wait');
   const hostConnectStarted=performance.now();
