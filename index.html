@@ -682,19 +682,11 @@ function applySnapshot(msg){if(!msg.worms)return;const localId=player?.id,map=ne
 function sendInput(force=false){if(!netConn||!netConn.open)return;const now=performance.now();if(!force&&now-netSendT<1000/NET_HZ)return;netSendT=now;try{const pc=paintForPlayer();netConn.send({type:'input',clientId:player?.id,x:joyV.x,y:joyV.y,active:joyA,boost:boosting,name:document.getElementById('pName').value.trim()||'Você',col:pc.col,colD:pc.colD,rainbow:!!pc.rainbow,skinId:cfg.skinId,customPaint:Array.isArray(cfg.customPaint)?cfg.customPaint.slice(0,12):[]});}catch(e){}}
 function sendSnap(){if(netRole!=='host'||!netConn||!netConn.open)return;const now=performance.now();if(now-netSnapT<1000/NET_HZ)return;netSnapT=now;try{netConn.send(snapshot());}catch(e){}}
 function makeNetPeer(){
-  // PeerJS Cloud: usar as configurações padrão do serviço evita conflito
-  // entre host/path/SSL definidos manualmente e a configuração atual do Cloud.
-  return new Peer(undefined,{
-    debug:3,
-    pingInterval:5000,
-    config:{
-      iceServers:[
-        {urls:'stun:stun.l.google.com:19302'},
-        {urls:'stun:stun1.l.google.com:19302'}
-      ],
-      sdpSemantics:'unified-plan'
-    }
-  });
+  // v19: NÃO sobrescrever a configuração ICE do PeerJS Cloud.
+  // A versão 1.5.5 já traz STUN + TURN próprios; sobrescrever 'config'
+  // remove esses servidores e pode impedir a conexão entre redes diferentes.
+  // Também deixamos host/porta/SSL no padrão oficial do PeerJS Cloud.
+  return new Peer();
 }
 let netReconnectTimer=null, netReconnectBusy=false, netLastError='';
 function netErrorText(e){
@@ -754,7 +746,17 @@ function bindHostConnection(conn){
   if(netConn&&netConn.open){try{conn.close();}catch(e){}netMsg('A sala já está ocupada. Só 2 jogadores.','err');return;}
   netConn=conn; netRemoteId=conn.peer;
   netMsg('Conexão recebida. Estabelecendo jogo...','wait');
-  conn.on('open',()=>{
+  const hostConnectStarted=performance.now();
+  const hostConnectWatch=setInterval(()=>{
+    if(!netConn||netConn!==conn||conn.open){clearInterval(hostConnectWatch);return;}
+    if(performance.now()-hostConnectStarted>15000){
+      clearInterval(hostConnectWatch);
+      netReady=false;
+      netMsg('O outro jogador foi localizado, mas a conexão direta não abriu.','err');
+      try{conn.close();}catch(e){}
+    }
+  },500);
+  conn.on('open',()=>{clearInterval(hostConnectWatch);
     netReady=true;
     netMsg('Jogador conectado. Aperte JOGAR.','ok');
     setBadge();
@@ -778,8 +780,17 @@ function connectGuestToHost(){
   if(!code){netMsg('Digite o código da sala.','err');netRole='solo';return;}
   if(netConn){try{netConn.close();}catch(e){}netConn=null;}
   netMsg('Conectando ao anfitrião...','wait');
-  const conn=netPeer.connect(code,{reliable:true,serialization:'json',metadata:{game:'minhocas-io',version:'v18'}});
+  const conn=netPeer.connect(code,{reliable:true,serialization:'json',metadata:{game:'minhocas-io',version:'v19'}});
   netConn=conn;
+  const connectStarted=performance.now();
+  const connectWatch=setInterval(()=>{
+    if(!netConn||netConn!==conn||conn.open){clearInterval(connectWatch);return;}
+    if(performance.now()-connectStarted>15000){
+      clearInterval(connectWatch);
+      netMsg('O anfitrião foi encontrado, mas a conexão direta não abriu. Tentando novamente...','err');
+      try{conn.close();}catch(e){}
+    }
+  },500);
   conn.on('open',()=>{
     netReady=true;
     netRemoteId=code;
